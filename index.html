@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carnatic Note Finder</title>
+<style>
+  :root {
+    --bg: #16181c;
+    --panel: #1e2127;
+    --panel-2: #242830;
+    --line: #31363f;
+    --text: #e6e9ee;
+    --muted: #9aa3b0;
+    --cyan: #22d3ee;
+    --cyan-dim: rgba(34, 211, 238, 0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Consolas", "Menlo", "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 20px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 12px;
+    margin-bottom: 18px;
+  }
+  header h1 {
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+  header span { color: var(--muted); font-size: 12px; }
+
+  section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  section h2 {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 10px;
+  }
+  .hint { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+
+  button {
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  button:hover { background: rgba(34, 211, 238, 0.22); }
+  button.stop { border-color: #f87171; color: #f87171; background: rgba(248,113,113,0.1); }
+
+  /* Section 1: Live Note Display */
+  #note-card {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: border-color 0.25s;
+  }
+  #note-card.active { border-color: var(--cyan); }
+  #current-note {
+    font-size: 56px;
+    font-weight: bold;
+    color: var(--text);
+    letter-spacing: 4px;
+  }
+  #current-note.flash { color: var(--cyan); text-shadow: 0 0 18px rgba(34,211,238,0.6); }
+  #status-line {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 6px;
+    min-height: 18px;
+  }
+  #meter {
+    height: 4px;
+    background: var(--line);
+    border-radius: 2px;
+    margin-top: 14px;
+    overflow: hidden;
+  }
+  #meter-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--cyan);
+    transition: width 0.3s ease;
+  }
+
+  /* Section 2: Practice Panel */
+  .practice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .scale-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .swara {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    text-align: center;
+    min-width: 56px;
+    cursor: pointer;
+  }
+  .swara b { display: block; color: var(--cyan); font-size: 16px; }
+  .swara small { color: var(--muted); font-size: 10px; }
+  .swara:hover { border-color: var(--cyan); }
+  .tips p {
+    background: var(--panel-2);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 6px 6px 0;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* Section 3: Session View */
+  .entry {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .entry .time { color: var(--cyan); min-width: 70px; font-size: 12px; }
+  .entry .note-name { font-weight: bold; font-size: 16px; min-width: 60px; }
+  .entry .desc { color: var(--muted); font-size: 12px; }
+
+  footer { color: var(--muted); font-size: 11px; text-align: center; }
+  @media (max-width: 640px) {
+    .practice-grid { grid-template-columns: 1fr; }
+    body { padding: 12px; }
+    #current-note { font-size: 44px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Carnatic Note Finder</h1>
+  <span>string practice &middot; studio mode</span>
+</header>
+
+<!-- Section 1: Live Note Display -->
+<section id="live-section">
+  <h2>1 &middot; Live Note Display</h2>
+  <p class="hint">Tap play to run a sample note sequence (simulated detection — no microphone).</p>
+  <div id="note-card">
+    <div id="current-note">—</div>
+    <div id="status-line">Idle. Waiting to start.</div>
+    <div id="meter"><div id="meter-fill"></div></div>
+  </div>
+  <div style="margin-top:12px;">
+    <button id="play-btn" onclick="togglePlay()">&#9654; Start Live View</button>
+  </div>
+</section>
+
+<!-- Section 2: Practice Panel -->
+<section id="practice-section">
+  <h2>2 &middot; Practice Panel</h2>
+  <div class="practice-grid">
+    <div>
+      <p class="hint">Mayamalavagowla scale (15th melakarta) — a common starting scale:</p>
+      <div class="scale-row" id="scale-row"></div>
+    </div>
+    <div class="tips">
+      <p>Tip 1: Tune your strings so Sa matches your comfortable tonic — many players in Malaysia tune Sa to C or D on violin.</p>
+      <p>Tip 2: Slide (gamaka) between swaras on one string instead of lifting the finger — it gives the Carnatic feel.</p>
+      <p>Tip 3: Practise slowly with a tanpura drone app; keep the four fingers on one string before crossing strings.</p>
+      <p>Tip 4: Tap each swara above to hear-style its position — use it as a fingerboard reminder while practising.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Section 3: Session View -->
+<section id="session-section">
+  <h2>3 &middot; Session View</h2>
+  <p class="hint">Sample practice session — example entries only, not real recordings.</p>
+  <div id="session-list"></div>
+</section>
+
+<footer>Sample data only &middot; nothing is saved between visits.</footer>
+
+<script>
+  // ---- Scale reference (Mayamalavagowla) ----
+  const scale = [
+    { s: "Sa", w: "S", hint: "tonic / open string" },
+    { s: "Ri", w: "R₁", hint: "shuddha rishabha" },
+    { s: "Ga", w: "G₃", hint: "antara gandhara" },
+    { s: "Ma", w: "M₁", hint: "shuddha madhyama" },
+    { s: "Pa", w: "P", hint: "panchama" },
+    { s: "Da", w: "D₁", hint: "shuddha dhaivata" },
+    { s: "Ni", w: "N₃", hint: "kakali nishada" },
+    { s: "Sa", w: "Ṡ", hint: "upper octave" },
+  ];
+  const scaleRow = document.getElementById("scale-row");
+  scale.forEach((n, i) => {
+    const d = document.createElement("div");
+    d.className = "swara";
+    d.innerHTML = "<b>" + n.s + "</b><small>" + n.w + " · " + n.hint + "</small>";
+    d.onclick = () => {
+      if (!playing) {
+        document.getElementById("current-note").textContent = n.s.toUpperCase();
+        setStatus("Preview from scale: " + n.s + " (" + n.hint + ")");
+      }
+    };
+    scaleRow.appendChild(d);
+  });
+
+  // ---- Sample session entries (made up, Malaysia-specific) ----
+  const sessionEntries = [
+    { time: "0:00", note: "Sa", desc: "Aarohana warm-up — Kuala Lumpur student group, violin, Sa = C" },
+    { time: "0:12", note: "Ga", desc: "Gamaka slide drill on G string — practice at Petaling Jaya music studio" },
+    { time: "0:25", note: "Pa", desc: "Varnam phrase rehearsal — after-school Carnatic class, Penang" },
+    { time: "0:38", note: "Ni", desc: "Upper octave stretch — home practice, Johor Bahru" },
+  ];
+  const list = document.getElementById("session-list");
+  sessionEntries.forEach(e => {
+    const d = document.createElement("div");
+    d.className = "entry";
+    d.innerHTML = '<span class="time">' + e.time + '</span>' +
+                  '<span class="note-name">' + e.note + '</span>' +
+                  '<span class="desc">' + e.desc + '</span>';
+    list.appendChild(d);
+  });
+
+  // ---- Live note sequence ----
+  const seq = ["SA", "RI", "GA", "MA", "PA", "DA", "NI", "SA", "NI", "DA", "PA", "MA", "GA", "RI", "SA"];
+  let playing = false;
+  let timer = null;
+  let idx = 0;
+  const noteEl = document.getElementById("current-note");
+  const statusEl = document.getElementById("status-line");
+  const meterFill = document.getElementById("meter-fill");
+  const playBtn = document.getElementById("play-btn");
+  const noteCard = document.getElementById("note-card");
+
+  function setStatus(t) { statusEl.textContent = t; }
+
+  function togglePlay() {
+    if (playing) {
+      stopPlay();
+    } else {
+      playing = true;
+      idx = 0;
+      playBtn.innerHTML = "&#9632; Stop";
+      playBtn.classList.add("stop");
+      noteCard.classList.add("active");
+      step();
+      timer = setInterval(step, 600);
+      setStatus("Listening… (simulated sample)");
+    }
+  }
+
+  function stopPlay() {
+    playing = false;
+    clearInterval(timer);
+    playBtn.innerHTML = "&#9654; Start Live View";
+    playBtn.classList.remove("stop");
+    noteCard.classList.remove("active");
+    meterFill.style.width = "0%";
+    setStatus("Stopped. Session kept in Session View below.");
+  }
+
+  function step() {
+    const n = seq[idx % seq.length];
+    idx++;
+    noteEl.textContent = n;
+    noteEl.classList.add("flash");
+    setTimeout(() => noteEl.classList.remove("flash"), 300);
+    const conf = 60 + Math.round(Math.random() * 35);
+    meterFill.style.width = conf + "%";
+    setStatus("Detected: " + n + " · sample strength " + conf + "% (simulated)");
+  }
+</script>
+
+</body>
+</html>
